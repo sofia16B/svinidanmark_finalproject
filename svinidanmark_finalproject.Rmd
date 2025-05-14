@@ -1,0 +1,210 @@
+---
+title: "Svin i Danmark"
+author: "Sofia Rosenthal"
+date: "2025-05-02"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+```
+```{r}
+#Indlæs datasæt
+library(tidyverse)
+svin <- read_csv("data/svinidanmark.csv")
+
+#Jylland objekt
+jylland_amter <- c("Hjoerring", "Thisted", "Aalborg", "Viborg", "Randers", "Aarhus", "Vejle", "Ringkoebing", "Ribe")
+
+jylland <- svin %>%
+  filter(amt %in% jylland_amter)
+
+#Oerne objekt
+oerne_amter <- c("Kbn stad", "Kbn amt", "Frederiksborg", "Holbaek", "Soroe", "Praestoe", "Bornholms", "Maribo", "Odense", "Svendborg")
+
+oerne <- svin %>%
+  filter(amt %in% oerne_amter)
+
+```
+
+```{r}
+#Antal svin i hele landet
+ggplot(svin, aes(x = Aar, y = antal_svin, color = amt)) +
+  geom_line() +
+  scale_x_continuous(breaks = unique(svin$Aar)) + 
+  labs(title = "Figur 1: Svinebestand i Danmark (1861–1914)",
+       x = "Aar", y = "Antal svin") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) 
+```
+```{r}
+#Antal svin i Jylland
+
+# 1. Opsummer antal svin i Jylland pr. år
+jylland_total <- jylland %>%
+  group_by(Aar) %>%
+  summarise(antal_svin = sum(antal_svin, na.rm = TRUE))
+
+# 2. Lav grafen
+library(scales)
+
+ggplot(jylland_total, aes(x = Aar, y = antal_svin)) +
+  geom_line(color = "darkgreen", size = 1) +
+  scale_x_continuous(breaks = unique(jylland_total$Aar)) +
+  scale_y_continuous(labels = comma) +  # <- fjerner videnskabelig notation
+  labs(title = "Figur 2: Svinebestand i Jylland (1861–1914)",
+       x = "Aar", y = "Antal svin") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+```
+
+
+
+```{r}
+#Antal svin på oerne
+
+# 1. Opsummer antal svin på oerne
+oerne_total <- oerne %>%
+  group_by(Aar) %>%
+  summarise(antal_svin = sum(antal_svin, na.rm = TRUE))
+
+# 2. Lav grafen
+
+library(ggplot2)
+
+ggplot(oerne_total, aes(x = Aar, y = antal_svin)) +
+  geom_line(color = "darkblue", size = 1) +  # Du kan vælge en anden farve end Jylland
+  scale_x_continuous(breaks = unique(oerne_total$Aar)) +
+  scale_y_continuous(labels = comma) +  # Fjerner videnskabelig notation
+  labs(title = "Figur 3: Svinebestand på Oerne (1861–1914)",
+       x = "Aar", y = "Antal svin") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+```
+```{r}
+# Kombinér de to datasæt med en ny kolonne 'region'
+jylland_total$region <- "jylland"
+oerne_total$region <- "oerne"
+
+samlet <- bind_rows(jylland_total, oerne_total)
+
+# Sammenlign i én graf
+ggplot(samlet, aes(x = Aar, y = antal_svin, color = region)) +
+  geom_line(size = 1.2) +
+  scale_x_continuous(breaks = unique(samlet$Aar)) +
+  scale_y_continuous(breaks = seq(0, max(jylland_total$antal_svin), by = 100000),labels = scales::comma) +
+  labs(title = "Figur 4: Udvikling i svinebestand: jylland vs. oerne (1861–1914)",
+       x = "Aar", y = "Antal svin", color = "Region") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+```
+```{r}
+# Gennemsnitlige årlig vækst
+jylland_vaekst <- (last(jylland_total$antal_svin) - first(jylland_total$antal_svin)) / 
+  (last(jylland_total$Aar) - first(jylland_total$Aar))
+
+oerne_vaekst <- (last(oerne_total$antal_svin) - first(oerne_total$antal_svin)) / 
+  (last(oerne_total$Aar) - first(oerne_total$Aar))
+
+jylland_vaekst
+oerne_vaekst
+```
+```{r}
+#Gennemsnitlige årlige vækst i procent
+# For Jylland
+jylland_pct <- jylland_total %>%
+  arrange(Aar) %>%
+  mutate(procent_stigning = (antal_svin - lag(antal_svin)) / lag(antal_svin) * 100)
+
+# For Øerne
+oerne_pct <- oerne_total %>%
+  arrange(Aar) %>%
+  mutate(procent_stigning = (antal_svin - lag(antal_svin)) / lag(antal_svin) * 100)
+
+# For Jylland
+gennemsnit_jylland <- mean(jylland_pct$procent_stigning, na.rm = TRUE)
+
+# For Øerne
+gennemsnit_oerne <- mean(oerne_pct$procent_stigning, na.rm = TRUE)
+
+# Udskriv resultater
+gennemsnit_jylland
+gennemsnit_oerne
+```
+
+```{r}
+#Stigning i antal svin pr år
+library(dplyr)
+
+jylland_stigning <- jylland_total %>%
+  arrange(Aar) %>%
+  mutate(stigning = antal_svin - lag(antal_svin))
+
+oerne_stigning <- oerne_total %>%
+  arrange(Aar) %>%
+  mutate(stigning = antal_svin - lag(antal_svin))
+
+```
+
+```{r}
+#Højeste stigning Jylland
+jylland_stigning %>%
+  filter(stigning == max(stigning, na.rm = TRUE)) %>%
+  select(Aar, stigning)
+```
+
+```{r}
+
+#Laveste stigning Jylland
+jylland_stigning %>%
+  filter(stigning == min(stigning, na.rm = TRUE)) %>%
+  select(Aar, stigning)
+
+```
+```{r}
+#Højeste stigning oerne
+oerne_stigning %>%
+  filter(stigning == max(stigning, na.rm = TRUE)) %>%
+  select(Aar, stigning)
+```
+```{r}
+#Laveste stigning Oerne
+oerne_stigning %>%
+  filter(stigning == min(stigning, na.rm = TRUE)) %>%
+  select(Aar, stigning)
+```
+```{r}
+#Stacked plot area
+# 1. Tilføj regionsnavn
+jylland_total$region <- "jylland"
+oerne_total$region <- "oerne"
+
+# 2. Saml data
+sammenlagt <- bind_rows(jylland_total, oerne_total)
+
+# 3. Lav grafen
+
+ggplot(sammenlagt, aes(x = Aar, y = antal_svin, fill = region)) +
+  geom_area(alpha = 0.8) +
+  labs(title = "Figur 5: Stacked plot over svinebestanden i Jylland og på Oerne (1861-1914)",
+       x = "Aar", y = "Antal svin", fill = "Region") +
+  scale_y_continuous(labels = scales::comma) +
+  scale_x_continuous(breaks = unique(sammenlagt$Aar)) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+```
+```{r}
+#Skæringspunkt: Hvornår overhaler Jylland Oerne?
+sammenlign <- jylland_total %>%
+  rename(jylland = antal_svin) %>%
+  inner_join(oerne_total %>% rename(oerne = antal_svin), by = "Aar")
+
+skaeringspunkt <- sammenlign %>%
+  filter(jylland >= oerne) %>%
+  slice(1) # første år hvor Jylland ≥ Øerne
+
+print(skaeringspunkt)
+```
